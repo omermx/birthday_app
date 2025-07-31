@@ -328,22 +328,28 @@
 
 .day {
   background-color: #fafafa;
-  min-height: clamp(60px, 8vh, 120px);
+  width: 108px;
+  height: 98px;
   padding: clamp(0.25rem, 1vw, 0.5rem);
   position: relative;
   border: 1px solid #eee;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .day.empty {
   background-color: transparent;
   border: none;
+  width: 108px;
+  height: 98px;
 }
 
 .day.has-events {
   background-color: #e8f5e8;
   border-color: #4caf50;
+  width: 108px;
+  height: 98px;
 }
 
 .day-header {
