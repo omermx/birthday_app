@@ -1,6 +1,6 @@
 # Birthday Tracker
 
-A modern web application for tracking birthdays and anniversaries by importing calendar files. Built with React and powered by Vite for fast development and optimal performance.
+A totally vibe coded, modern web application for tracking birthdays and anniversaries by importing calendar files. Built with React and powered by Vite for fast development and optimal performance.
 
 ## Overview
 
