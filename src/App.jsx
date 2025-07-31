@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { FaBars, FaTimes, FaCalendarAlt, FaUpload, FaHome, FaCheck } from 'react-icons/fa'
+import { useState, useEffect } from 'react'
+import { FaBars, FaTimes, FaCalendarAlt, FaUpload, FaHome, FaCheck, FaArrowLeft, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns'
 import ICAL from 'ical.js'
 import './App.css'
 
@@ -9,6 +10,32 @@ function App() {
   const [events, setEvents] = useState([])
   const [showSuccessPopup, setShowSuccessPopup] = useState(false)
   const [eventCount, setEventCount] = useState(0)
+  const [, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  })
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      })
+      
+      // Close menu on resize if it's open and screen becomes larger
+      if (isMenuOpen && window.innerWidth > 768) {
+        setIsMenuOpen(false)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('orientationchange', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('orientationchange', handleResize)
+    }
+  }, [isMenuOpen])
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
@@ -25,15 +52,34 @@ function App() {
         const comp = new ICAL.Component(jcalData)
         const vevents = comp.getAllSubcomponents('vevent')
         
+        const currentYear = new Date().getFullYear()
+        
         const parsedEvents = vevents.map(vevent => {
           const event = new ICAL.Event(vevent)
-          return {
+          const originalStartDate = event.startDate.toJSDate()
+          const originalEndDate = event.endDate.toJSDate()
+          
+          // Normalize dates to current year for birthday display
+          const normalizedStartDate = new Date(currentYear, originalStartDate.getMonth(), originalStartDate.getDate())
+          const normalizedEndDate = new Date(currentYear, originalEndDate.getMonth(), originalEndDate.getDate())
+          
+          // Extract numerical value from description field for yearBorn
+          const description = event.description || ''
+          const yearMatch = description.match(/\b(19|20)\d{2}\b/)
+          const yearFromDescription = yearMatch ? parseInt(yearMatch[0]) : null
+          
+          const parsedEvent = {
             summary: event.summary,
-            startDate: event.startDate.toJSDate(),
-            endDate: event.endDate.toJSDate(),
-            description: event.description || '',
-            location: event.location || ''
+            startDate: normalizedStartDate,
+            endDate: normalizedEndDate,
+            yearBorn: yearFromDescription || originalStartDate.getFullYear(),
+            description: description,
+            location: event.location || '',
+            month: originalStartDate.getMonth(),
+            day: originalStartDate.getDate()
           }
+          
+          return parsedEvent
         })
         
         setEvents(parsedEvents)
@@ -51,13 +97,13 @@ function App() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'welcome':
-        return <WelcomePage />
+        return <WelcomePage onNavigate={navigateTo} events={events} />
       case 'upload':
-        return <UploadPage onFileUpload={handleFileUpload} />
+        return <UploadPage onFileUpload={handleFileUpload} onNavigate={navigateTo} />
       case 'calendar':
-        return <CalendarPage events={events} />
+        return <CalendarPage events={events} onNavigate={navigateTo} />
       default:
-        return <WelcomePage />
+        return <WelcomePage onNavigate={navigateTo} events={events} />
     }
   }
 
@@ -98,18 +144,41 @@ function App() {
   )
 }
 
-function WelcomePage() {
+function WelcomePage({ onNavigate, events }) {
+  const getUpcomingEventsThisMonth = () => {
+    if (!events || events.length === 0) return 0
+    
+    const currentDate = new Date()
+    const currentMonth = currentDate.getMonth()
+    const currentDay = currentDate.getDate()
+    
+    return events.filter(event => {
+      return event.month === currentMonth && event.day >= currentDay
+    }).length
+  }
+
+  const upcomingCount = getUpcomingEventsThisMonth()
+  const currentMonthName = format(new Date(), 'MMMM')
+
   return (
     <div className="welcome-page">
       <h2>Welcome to Birthday Tracker!</h2>
       <p>Keep track of all your friends' and family's birthdays in one place.</p>
+      
+      {events && events.length > 0 && (
+        <div className="upcoming-events">
+          <h3>This Month</h3>
+          <p>{upcomingCount === 0 ? 'No more events this month!' : `${upcomingCount} event${upcomingCount !== 1 ? 's' : ''} in ${currentMonthName}`}</p>
+        </div>
+      )}
+      
       <div className="features">
-        <div className="feature">
+        <div className="feature" onClick={() => onNavigate('upload')}>
           <FaUpload size={40} />
           <h3>Upload Calendar</h3>
           <p>Import your birthday events from .ics files</p>
         </div>
-        <div className="feature">
+        <div className="feature" onClick={() => onNavigate('calendar')}>
           <FaCalendarAlt size={40} />
           <h3>View Calendar</h3>
           <p>See all birthdays in a monthly calendar view</p>
@@ -119,7 +188,7 @@ function WelcomePage() {
   )
 }
 
-function UploadPage({ onFileUpload }) {
+function UploadPage({ onFileUpload, onNavigate }) {
   const [selectedFile, setSelectedFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
 
@@ -145,6 +214,9 @@ function UploadPage({ onFileUpload }) {
 
   return (
     <div className="upload-page">
+      <button className="back-button" onClick={() => onNavigate('welcome')}>
+        <FaArrowLeft /> Back to Home
+      </button>
       <h2>Upload Birthday Calendar</h2>
       <p>Select an .ics or .ical file containing birthday events</p>
       <div className="upload-area">
@@ -166,14 +238,226 @@ function UploadPage({ onFileUpload }) {
   )
 }
 
-function CalendarPage() {
+function CalendarPage({ events, onNavigate }) {
+  const [showEmptyState, setShowEmptyState] = useState(false)
+  const [gridColumns, setGridColumns] = useState(1)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedEvent, setSelectedEvent] = useState(null)
+  const [eventDate, setEventDate] = useState(null)
+  
+  useEffect(() => {
+    if (!events || events.length === 0) {
+      setShowEmptyState(true)
+      const timer = setTimeout(() => setShowEmptyState(false), 3000)
+      return () => clearTimeout(timer)
+    } else {
+      setShowEmptyState(false)
+    }
+  }, [events])
+
+  const navigateYear = (direction) => {
+    setSelectedYear(prev => direction === 'next' ? prev + 1 : prev - 1)
+  }
+
+  const handleEventClick = (event, date) => {
+    setSelectedEvent(event)
+    setEventDate(date)
+  }
+
+  const closeEventPopup = () => {
+    setSelectedEvent(null)
+    setEventDate(null)
+  }
+
+  const calculateAge = (event, viewDate) => {
+    if (!event.yearBorn) return null
+    
+    const birthYear = event.yearBorn
+    const viewYear = viewDate.getFullYear()
+    const birthMonth = event.month
+    const birthDay = event.day
+    const viewMonth = viewDate.getMonth()
+    const viewDay = viewDate.getDate()
+    
+    let age = viewYear - birthYear
+    
+    // Adjust if birthday hasn't occurred yet this year
+    if (viewMonth < birthMonth || (viewMonth === birthMonth && viewDay < birthDay)) {
+      age--
+    }
+    
+    return age
+  }
+
+  useEffect(() => {
+    const updateGridColumns = () => {
+      const width = window.innerWidth
+      if (width < 600) {
+        setGridColumns(1)
+      } else if (width < 900) {
+        setGridColumns(2)
+      } else if (width < 1200) {
+        setGridColumns(3)
+      } else if (width < 1600) {
+        setGridColumns(4)
+      } else if (width < 2000) {
+        setGridColumns(5)
+      } else {
+        setGridColumns(6)
+      }
+    }
+
+    updateGridColumns()
+    window.addEventListener('resize', updateGridColumns)
+    
+    return () => window.removeEventListener('resize', updateGridColumns)
+  }, [])
+
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const date = new Date(selectedYear, i, 1)
+    return {
+      name: format(date, 'MMMM yyyy'),
+      date,
+      days: eachDayOfInterval({
+        start: startOfMonth(date),
+        end: endOfMonth(date)
+      })
+    }
+  })
+
+  const getEventsForDate = (date) => {
+    if (!events) return []
+    
+    return events.filter(event => {
+      // Create normalized event date for the selected year
+      const normalizedEventDate = new Date(selectedYear, event.month, event.day)
+      const isSameDayMatch = isSameDay(normalizedEventDate, date)
+      
+      // Alternative method: Direct month/day comparison for extra safety
+      const isMonthDayMatch = event.month === date.getMonth() && event.day === date.getDate()
+      
+      return isSameDayMatch || isMonthDayMatch
+    })
+  }
+
   return (
     <div className="calendar-page">
+      <button className="back-button" onClick={() => onNavigate('welcome')}>
+        <FaArrowLeft /> Back to Home
+      </button>
       <h2>Birthday Calendar</h2>
-      <p>Monthly view of all birthdays</p>
-      <div className="calendar-placeholder">
-        <p>Calendar view will be implemented here</p>
+      
+      <div className="year-navigation">
+        <button className="year-nav-button" onClick={() => navigateYear('prev')}>
+          <FaChevronLeft />
+        </button>
+        <h3 className="year-display">{selectedYear}</h3>
+        <button className="year-nav-button" onClick={() => navigateYear('next')}>
+          <FaChevronRight />
+        </button>
       </div>
+      
+      <p>All birthdays for {selectedYear}</p>
+      
+      <div className="calendar-grid" style={{ gridTemplateColumns: `repeat(${gridColumns}, 1fr)` }}>
+        {months.map((month, monthIndex) => (
+          <div key={monthIndex} className="month-container">
+            <h3 className="month-title">{month.name}</h3>
+            <div className="month-grid">
+              <div className="weekdays">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="weekday">{day}</div>
+                ))}
+              </div>
+              <div className="days-grid">
+                {Array.from({ length: month.days[0].getDay() }, (_, i) => (
+                  <div key={`empty-${i}`} className="day empty"></div>
+                ))}
+                {month.days.map((day, dayIndex) => {
+                  const dayEvents = getEventsForDate(day)
+                  return (
+                    <div key={dayIndex} className={`day ${dayEvents.length > 0 ? 'has-events' : ''}`}>
+                      <div className="day-header">
+                        <span className="day-number">{format(day, 'd')}</span>
+                        {dayEvents.length > 0 && (
+                          <span className="event-badge">{dayEvents.length}</span>
+                        )}
+                      </div>
+                      {dayEvents.length > 0 && (
+                        <div className="events">
+                          {dayEvents.slice(0, 2).map((event, eventIndex) => (
+                            <div 
+                              key={eventIndex} 
+                              className="event clickable" 
+                              title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
+                              onClick={() => handleEventClick(event, day)}
+                            >
+                              {event.summary.length > 15 ? event.summary.substring(0, 12) + '...' : event.summary}
+                            </div>
+                          ))}
+                          {dayEvents.length > 2 && (
+                            <div 
+                              className="event more-events clickable" 
+                              title={`Click to see all ${dayEvents.length} events`}
+                              onClick={() => handleEventClick(dayEvents[2], day)}
+                            >
+                              +{dayEvents.length - 2} more
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {showEmptyState && (
+        <div className="empty-state-popup">
+          <span>No events loaded yet</span>
+        </div>
+      )}
+      
+      {selectedEvent && eventDate && (
+        <div className="event-popup-overlay" onClick={closeEventPopup}>
+          <div className="event-popup" onClick={(e) => e.stopPropagation()}>
+            <button className="popup-close-button" onClick={closeEventPopup}>
+              Close
+            </button>
+            
+            <div className="popup-content">
+              <h3 className="popup-title">{selectedEvent.summary}</h3>
+              
+              <div className="popup-details">
+                <div className="popup-field">
+                  <strong>Date:</strong> {format(eventDate, 'MMMM d, yyyy')}
+                </div>
+                
+                {selectedEvent.yearBorn && (
+                  <div className="popup-field">
+                    <strong>{selectedEvent.summary.includes('[Anniversary]') ? 'Year:' : 'Born:'}</strong> {selectedEvent.yearBorn}
+                  </div>
+                )}
+                
+                {calculateAge(selectedEvent, eventDate) !== null && (
+                  <div className="popup-field age-field">
+                    <strong>{selectedEvent.summary.includes('[Anniversary]') ? 'Years Ago:' : 'Age:'}</strong> {calculateAge(selectedEvent, eventDate)} {selectedEvent.summary.includes('[Anniversary]') ? 'years ago' : 'years old'}
+                  </div>
+                )}
+                
+                {selectedEvent.location && (
+                  <div className="popup-field">
+                    <strong>Location:</strong> {selectedEvent.location}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
