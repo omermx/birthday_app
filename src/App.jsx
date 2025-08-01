@@ -244,6 +244,14 @@ function CalendarPage({ events, onNavigate }) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [eventDate, setEventDate] = useState(null)
+  const [viewMode, setViewMode] = useState('12months')
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    const today = new Date()
+    const start = new Date(today)
+    start.setDate(today.getDate() - today.getDay())
+    return start
+  })
+  const [currentMonth, setCurrentMonth] = useState(() => new Date())
   
   useEffect(() => {
     if (!events || events.length === 0) {
@@ -257,6 +265,26 @@ function CalendarPage({ events, onNavigate }) {
 
   const navigateYear = (direction) => {
     setSelectedYear(prev => direction === 'next' ? prev + 1 : prev - 1)
+  }
+
+  const navigateWeek = (direction) => {
+    setCurrentWeekStart(prev => {
+      const newDate = new Date(prev)
+      newDate.setDate(prev.getDate() + (direction === 'next' ? 7 : -7))
+      return newDate
+    })
+  }
+
+  const navigateMonth = (direction) => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev)
+      if (direction === 'next') {
+        newDate.setMonth(prev.getMonth() + 1)
+      } else {
+        newDate.setMonth(prev.getMonth() - 1)
+      }
+      return newDate
+    })
   }
 
   const handleEventClick = (event, date) => {
@@ -313,6 +341,31 @@ function CalendarPage({ events, onNavigate }) {
     return () => window.removeEventListener('resize', updateGridColumns)
   }, [])
 
+  const getCurrentMonth = () => {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+    return {
+      name: format(date, 'MMMM yyyy'),
+      date,
+      days: eachDayOfInterval({
+        start: startOfMonth(date),
+        end: endOfMonth(date)
+      })
+    }
+  }
+
+  const getCurrentWeek = () => {
+    const endOfWeek = new Date(currentWeekStart)
+    endOfWeek.setDate(currentWeekStart.getDate() + 6)
+    
+    return {
+      name: `${format(currentWeekStart, 'MMM d')} - ${format(endOfWeek, 'MMM d, yyyy')}`,
+      days: eachDayOfInterval({
+        start: currentWeekStart,
+        end: endOfWeek
+      })
+    }
+  }
+
   const months = Array.from({ length: 12 }, (_, i) => {
     const date = new Date(selectedYear, i, 1)
     return {
@@ -347,22 +400,119 @@ function CalendarPage({ events, onNavigate }) {
       </button>
       <h2>Birthday Calendar</h2>
       
-      <div className="year-navigation">
-        <button className="year-nav-button" onClick={() => navigateYear('prev')}>
-          <FaChevronLeft />
-        </button>
-        <h3 className="year-display">{selectedYear}</h3>
-        <button className="year-nav-button" onClick={() => navigateYear('next')}>
-          <FaChevronRight />
-        </button>
+      <div className="view-controls">
+        <div className="view-toggle">
+          <button 
+            className={`view-toggle-button ${viewMode === 'week' ? 'active' : ''}`}
+            onClick={() => setViewMode('week')}
+          >
+            Week
+          </button>
+          <button 
+            className={`view-toggle-button ${viewMode === 'month' ? 'active' : ''}`}
+            onClick={() => setViewMode('month')}
+          >
+            Month
+          </button>
+          <button 
+            className={`view-toggle-button ${viewMode === '12months' ? 'active' : ''}`}
+            onClick={() => setViewMode('12months')}
+          >
+            12 Months
+          </button>
+        </div>
+        
+        <div className="year-navigation">
+          {viewMode === 'week' && (
+            <>
+              <button className="year-nav-button" onClick={() => navigateWeek('prev')}>
+                <FaChevronLeft />
+              </button>
+              <h3 className="year-display">Week</h3>
+              <button className="year-nav-button" onClick={() => navigateWeek('next')}>
+                <FaChevronRight />
+              </button>
+            </>
+          )}
+          {viewMode === 'month' && (
+            <>
+              <button className="year-nav-button" onClick={() => navigateMonth('prev')}>
+                <FaChevronLeft />
+              </button>
+              <h3 className="year-display">Month</h3>
+              <button className="year-nav-button" onClick={() => navigateMonth('next')}>
+                <FaChevronRight />
+              </button>
+            </>
+          )}
+          {viewMode === '12months' && (
+            <>
+              <button className="year-nav-button" onClick={() => navigateYear('prev')}>
+                <FaChevronLeft />
+              </button>
+              <h3 className="year-display">{selectedYear}</h3>
+              <button className="year-nav-button" onClick={() => navigateYear('next')}>
+                <FaChevronRight />
+              </button>
+            </>
+          )}
+        </div>
       </div>
       
-      <p>All birthdays for {selectedYear}</p>
+      <p>
+        {viewMode === 'week' ? `Week of ${getCurrentWeek().name}` : 
+         viewMode === 'month' ? `${getCurrentMonth().name}` : 
+         `All birthdays for ${selectedYear}`}
+      </p>
       
-      <div className="calendar-grid" style={{ gridTemplateColumns: `repeat(${gridColumns}, 1fr)` }}>
-        {months.map((month, monthIndex) => (
-          <div key={monthIndex} className="month-container">
-            <h3 className="month-title">{month.name}</h3>
+      {viewMode === 'week' && (
+        <div className="week-view">
+          <div className="week-container">
+            <h3 className="week-title">{getCurrentWeek().name}</h3>
+            <div className="week-grid">
+              <div className="weekdays">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="weekday">{day}</div>
+                ))}
+              </div>
+              <div className="week-days-grid">
+                {getCurrentWeek().days.map((day, dayIndex) => {
+                  const dayEvents = getEventsForDate(day)
+                  return (
+                    <div key={dayIndex} className={`day ${dayEvents.length > 0 ? 'has-events' : ''}`}>
+                      <div className="day-header">
+                        <span className="day-number">{format(day, 'd')}</span>
+                        {dayEvents.length > 0 && (
+                          <span className="event-badge">{dayEvents.length}</span>
+                        )}
+                      </div>
+                      {dayEvents.length > 0 && (
+                        <div className="events">
+                          {dayEvents.map((event, eventIndex) => (
+                            <div 
+                              key={eventIndex} 
+                              className="event clickable" 
+                              title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
+                              onClick={() => handleEventClick(event, day)}
+                            >
+                              {event.summary.length > 20 ? event.summary.substring(0, 17) + '...' : event.summary}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewMode === 'month' && (
+        <div className="month-view">
+          <div className="month-container">
+            <h3 className="month-title">{getCurrentMonth().name}</h3>
             <div className="month-grid">
               <div className="weekdays">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -370,10 +520,10 @@ function CalendarPage({ events, onNavigate }) {
                 ))}
               </div>
               <div className="days-grid">
-                {Array.from({ length: month.days[0].getDay() }, (_, i) => (
+                {Array.from({ length: getCurrentMonth().days[0].getDay() }, (_, i) => (
                   <div key={`empty-${i}`} className="day empty"></div>
                 ))}
-                {month.days.map((day, dayIndex) => {
+                {getCurrentMonth().days.map((day, dayIndex) => {
                   const dayEvents = getEventsForDate(day)
                   return (
                     <div key={dayIndex} className={`day ${dayEvents.length > 0 ? 'has-events' : ''}`}>
@@ -412,8 +562,66 @@ function CalendarPage({ events, onNavigate }) {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {viewMode === '12months' && (
+        <div className="calendar-grid">
+          {months.map((month, monthIndex) => (
+            <div key={monthIndex} className="month-container">
+              <h3 className="month-title">{month.name}</h3>
+              <div className="month-grid">
+                <div className="weekdays">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="weekday">{day}</div>
+                  ))}
+                </div>
+                <div className="days-grid">
+                  {Array.from({ length: month.days[0].getDay() }, (_, i) => (
+                    <div key={`empty-${i}`} className="day empty"></div>
+                  ))}
+                  {month.days.map((day, dayIndex) => {
+                    const dayEvents = getEventsForDate(day)
+                    return (
+                      <div key={dayIndex} className={`day ${dayEvents.length > 0 ? 'has-events' : ''}`}>
+                        <div className="day-header">
+                          <span className="day-number">{format(day, 'd')}</span>
+                          {dayEvents.length > 0 && (
+                            <span className="event-badge">{dayEvents.length}</span>
+                          )}
+                        </div>
+                        {dayEvents.length > 0 && (
+                          <div className="events">
+                            {dayEvents.slice(0, 2).map((event, eventIndex) => (
+                              <div 
+                                key={eventIndex} 
+                                className="event clickable" 
+                                title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
+                                onClick={() => handleEventClick(event, day)}
+                              >
+                                {event.summary.length > 15 ? event.summary.substring(0, 12) + '...' : event.summary}
+                              </div>
+                            ))}
+                            {dayEvents.length > 2 && (
+                              <div 
+                                className="event more-events clickable" 
+                                title={`Click to see all ${dayEvents.length} events`}
+                                onClick={() => handleEventClick(dayEvents[2], day)}
+                              >
+                                +{dayEvents.length - 2} more
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       
       {showEmptyState && (
         <div className="empty-state-popup">
