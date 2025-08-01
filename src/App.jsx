@@ -110,7 +110,10 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Birthday Tracker</h1>
+        <h1>
+          <img src="/cake.svg" alt="Birthday Cake" className="header-icon" />
+          Birthday Tracker
+        </h1>
         <button className="menu-toggle" onClick={toggleMenu}>
           {isMenuOpen ? <FaTimes /> : <FaBars />}
         </button>
