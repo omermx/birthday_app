@@ -22,7 +22,7 @@ Birthday Tracker helps you keep track of all your friends' and family's birthday
 2. Install dependencies: `npm install`
 3. Start the development server: `npm run dev`
 4. Open your browser and navigate to the local development URL
-5. Upload a calendar file containing birthday/anniversary events
+5. Upload a calendar file containing birthday/anniversary events OR use the 'dummy-calendar.ics' file provided in the repository
 6. Browse your events in the calendar view
 
 ## Release Notes
@@ -31,7 +31,7 @@ Birthday Tracker helps you keep track of all your friends' and family's birthday
 
 **Key Features Added:**
 - ✨ **Calendar File Upload**: Import birthday and anniversary events from .ics/.ical files
-- 📅 **Interactive Calendar View**: Monthly grid layout with year navigation
+- 📅 **Interactive Calendar Views**: Week, Month and 12 month grid layouts with year navigation
 - 🎂 **Smart Age Calculation**: Automatically calculates ages and years since anniversaries
 - 🔍 **Event Details Popup**: Click events to view detailed information with birth year and calculated age
 - 📊 **Upcoming Events Counter**: Homepage displays count of remaining events in current month
