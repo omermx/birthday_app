@@ -27,6 +27,31 @@ Birthday Tracker helps you keep track of all your friends' and family's birthday
 
 ## Release Notes
 
+### V0.2 - Enhanced Event Management & Navigation
+
+**Key Features Added:**
+- 🎯 **"Today" Navigation Buttons**: Quick jump to current week, month, or year from any calendar view
+- 🎉 **Enhanced Multi-Event Display**: Improved hover functionality to reveal all events on busy days
+- ➕ **Create & Delete Events**: Full event management with popup forms and confirmation dialogs
+- 🖱️ **Right-Click Context Menu**: Elegant way to add events to days that already contain events
+- 🎈 **Event Overflow Management**: Smart display of multiple events with hover-to-expand functionality
+- 📝 **Form Validation**: Comprehensive input validation for new event creation
+- 🎂 **Visual Event Indicators**: Event count badges and hover hints for better user experience
+
+**User Experience Improvements:**
+- Hover over days with multiple events to see all events in an expanded, scrollable view
+- Right-click on any day to add new events via context menu
+- Today/Current Year buttons for instant navigation back to present time
+- Improved event visibility with backdrop effects and smooth transitions
+- Enhanced welcome page messaging to include anniversaries
+
+**Technical Enhancements:**
+- Context menu system with overlay and positioning logic
+- Event state management for add/edit/delete operations
+- Improved CSS hover states with z-index management and backdrop effects
+- Form handling with date picker and dropdown inputs
+- Event filtering and array manipulation for CRUD operations
+
 ### V0.1 - Initial Release
 
 **Key Features Added:**

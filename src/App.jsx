@@ -166,7 +166,7 @@ function WelcomePage({ onNavigate, events }) {
   return (
     <div className="welcome-page">
       <h2>Welcome to Birthday Tracker!</h2>
-      <p>Keep track of all your friends' and family's birthdays in one place.</p>
+      <p>Keep track of all your friends' and family's birthdays and anniversaries in one place.</p>
       
       {events && events.length > 0 && (
         <div className="upcoming-events">
@@ -255,6 +255,11 @@ function CalendarPage({ events, onNavigate }) {
     return start
   })
   const [currentMonth, setCurrentMonth] = useState(() => new Date())
+  const [showAddEventPopup, setShowAddEventPopup] = useState(false)
+  const [addEventDate, setAddEventDate] = useState(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [expandedDays, setExpandedDays] = useState(new Set())
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, date: null })
   
   useEffect(() => {
     if (!events || events.length === 0) {
@@ -290,6 +295,21 @@ function CalendarPage({ events, onNavigate }) {
     })
   }
 
+  const goToCurrentWeek = () => {
+    const today = new Date()
+    const start = new Date(today)
+    start.setDate(today.getDate() - today.getDay())
+    setCurrentWeekStart(start)
+  }
+
+  const goToCurrentMonth = () => {
+    setCurrentMonth(new Date())
+  }
+
+  const goToCurrentYear = () => {
+    setSelectedYear(new Date().getFullYear())
+  }
+
   const handleEventClick = (event, date) => {
     setSelectedEvent(event)
     setEventDate(date)
@@ -298,6 +318,76 @@ function CalendarPage({ events, onNavigate }) {
   const closeEventPopup = () => {
     setSelectedEvent(null)
     setEventDate(null)
+  }
+
+  const handleAddEventClick = (date) => {
+    setAddEventDate(date)
+    setShowAddEventPopup(true)
+  }
+
+  const closeAddEventPopup = () => {
+    setShowAddEventPopup(false)
+    setAddEventDate(null)
+  }
+
+  const handleDeleteEvent = () => {
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteEvent = () => {
+    if (selectedEvent) {
+      setEvents(prev => prev.filter(event => 
+        !(event.summary === selectedEvent.summary && 
+          event.month === selectedEvent.month && 
+          event.day === selectedEvent.day &&
+          event.yearBorn === selectedEvent.yearBorn)
+      ))
+      setShowDeleteConfirm(false)
+      closeEventPopup()
+    }
+  }
+
+  const cancelDeleteEvent = () => {
+    setShowDeleteConfirm(false)
+  }
+
+  const toggleDayExpansion = (date) => {
+    const dateKey = format(date, 'yyyy-MM-dd')
+    setExpandedDays(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(dateKey)) {
+        newSet.delete(dateKey)
+      } else {
+        newSet.add(dateKey)
+      }
+      return newSet
+    })
+  }
+
+  const isDayExpanded = (date) => {
+    const dateKey = format(date, 'yyyy-MM-dd')
+    return expandedDays.has(dateKey)
+  }
+
+  const handleDayRightClick = (e, date) => {
+    e.preventDefault()
+    setContextMenu({
+      show: true,
+      x: e.clientX,
+      y: e.clientY,
+      date: date
+    })
+  }
+
+  const closeContextMenu = () => {
+    setContextMenu({ show: false, x: 0, y: 0, date: null })
+  }
+
+  const handleContextMenuAddEvent = () => {
+    if (contextMenu.date) {
+      handleAddEventClick(contextMenu.date)
+    }
+    closeContextMenu()
   }
 
   const calculateAge = (event, viewDate) => {
@@ -435,6 +525,9 @@ function CalendarPage({ events, onNavigate }) {
               <button className="year-nav-button" onClick={() => navigateWeek('next')}>
                 <FaChevronRight />
               </button>
+              <button className="today-button" onClick={goToCurrentWeek}>
+                Today
+              </button>
             </>
           )}
           {viewMode === 'month' && (
@@ -446,6 +539,9 @@ function CalendarPage({ events, onNavigate }) {
               <button className="year-nav-button" onClick={() => navigateMonth('next')}>
                 <FaChevronRight />
               </button>
+              <button className="today-button" onClick={goToCurrentMonth}>
+                Today
+              </button>
             </>
           )}
           {viewMode === '12months' && (
@@ -456,6 +552,9 @@ function CalendarPage({ events, onNavigate }) {
               <h3 className="year-display">{selectedYear}</h3>
               <button className="year-nav-button" onClick={() => navigateYear('next')}>
                 <FaChevronRight />
+              </button>
+              <button className="today-button" onClick={goToCurrentYear}>
+                Current Year
               </button>
             </>
           )}
@@ -482,7 +581,11 @@ function CalendarPage({ events, onNavigate }) {
                 {getCurrentWeek().days.map((day, dayIndex) => {
                   const dayEvents = getEventsForDate(day)
                   return (
-                    <div key={dayIndex} className={`day ${dayEvents.length > 0 ? 'has-events' : ''}`}>
+                    <div 
+                      key={dayIndex} 
+                      className={`day ${dayEvents.length > 0 ? 'has-events' : 'clickable-day'} ${isDayExpanded(day) ? 'expanded' : ''}`}
+                      onContextMenu={(e) => handleDayRightClick(e, day)}
+                    >
                       <div className="day-header">
                         <span className="day-number">{format(day, 'd')}</span>
                         {dayEvents.length > 0 && (
@@ -491,16 +594,37 @@ function CalendarPage({ events, onNavigate }) {
                       </div>
                       {dayEvents.length > 0 && (
                         <div className="events">
-                          {dayEvents.map((event, eventIndex) => (
-                            <div 
-                              key={eventIndex} 
-                              className="event clickable" 
-                              title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
-                              onClick={() => handleEventClick(event, day)}
-                            >
-                              {event.summary.length > 20 ? event.summary.substring(0, 17) + '...' : event.summary}
+                          <div className="events-container">
+                            {dayEvents.map((event, eventIndex) => (
+                              <div 
+                                key={eventIndex} 
+                                className="event clickable" 
+                                title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEventClick(event, day)
+                                }}
+                              >
+                                {event.summary.length > 20 ? event.summary.substring(0, 17) + '...' : event.summary}
+                              </div>
+                            ))}
+                          </div>
+                          {dayEvents.length > 2 && (
+                            <div className="event-count-indicator">
+                              {dayEvents.length} events (hover to see all)
                             </div>
-                          ))}
+                          )}
+                        </div>
+                      )}
+                      {dayEvents.length === 0 && (
+                        <div 
+                          className="add-event-overlay" 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddEventClick(day)
+                          }}
+                        >
+                          <span className="add-event-plus">+</span>
                         </div>
                       )}
                     </div>
@@ -529,7 +653,11 @@ function CalendarPage({ events, onNavigate }) {
                 {getCurrentMonth().days.map((day, dayIndex) => {
                   const dayEvents = getEventsForDate(day)
                   return (
-                    <div key={dayIndex} className={`day ${dayEvents.length > 0 ? 'has-events' : ''}`}>
+                    <div 
+                      key={dayIndex} 
+                      className={`day ${dayEvents.length > 0 ? 'has-events' : 'clickable-day'} ${isDayExpanded(day) ? 'expanded' : ''}`}
+                      onContextMenu={(e) => handleDayRightClick(e, day)}
+                    >
                       <div className="day-header">
                         <span className="day-number">{format(day, 'd')}</span>
                         {dayEvents.length > 0 && (
@@ -538,25 +666,37 @@ function CalendarPage({ events, onNavigate }) {
                       </div>
                       {dayEvents.length > 0 && (
                         <div className="events">
-                          {dayEvents.slice(0, 2).map((event, eventIndex) => (
-                            <div 
-                              key={eventIndex} 
-                              className="event clickable" 
-                              title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
-                              onClick={() => handleEventClick(event, day)}
-                            >
-                              {event.summary.length > 15 ? event.summary.substring(0, 12) + '...' : event.summary}
-                            </div>
-                          ))}
+                          <div className="events-container">
+                            {dayEvents.map((event, eventIndex) => (
+                              <div 
+                                key={eventIndex} 
+                                className="event clickable" 
+                                title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEventClick(event, day)
+                                }}
+                              >
+                                {event.summary.length > 15 ? event.summary.substring(0, 12) + '...' : event.summary}
+                              </div>
+                            ))}
+                          </div>
                           {dayEvents.length > 2 && (
-                            <div 
-                              className="event more-events clickable" 
-                              title={`Click to see all ${dayEvents.length} events`}
-                              onClick={() => handleEventClick(dayEvents[2], day)}
-                            >
-                              +{dayEvents.length - 2} more
+                            <div className="event-count-indicator">
+                              {dayEvents.length} events
                             </div>
                           )}
+                        </div>
+                      )}
+                      {dayEvents.length === 0 && (
+                        <div 
+                          className="add-event-overlay" 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddEventClick(day)
+                          }}
+                        >
+                          <span className="add-event-plus">+</span>
                         </div>
                       )}
                     </div>
@@ -586,7 +726,11 @@ function CalendarPage({ events, onNavigate }) {
                   {month.days.map((day, dayIndex) => {
                     const dayEvents = getEventsForDate(day)
                     return (
-                      <div key={dayIndex} className={`day ${dayEvents.length > 0 ? 'has-events' : ''}`}>
+                      <div 
+                        key={dayIndex} 
+                        className={`day ${dayEvents.length > 0 ? 'has-events' : 'clickable-day'} ${isDayExpanded(day) ? 'expanded' : ''}`}
+                        onContextMenu={(e) => handleDayRightClick(e, day)}
+                      >
                         <div className="day-header">
                           <span className="day-number">{format(day, 'd')}</span>
                           {dayEvents.length > 0 && (
@@ -595,25 +739,37 @@ function CalendarPage({ events, onNavigate }) {
                         </div>
                         {dayEvents.length > 0 && (
                           <div className="events">
-                            {dayEvents.slice(0, 2).map((event, eventIndex) => (
-                              <div 
-                                key={eventIndex} 
-                                className="event clickable" 
-                                title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
-                                onClick={() => handleEventClick(event, day)}
-                              >
-                                {event.summary.length > 15 ? event.summary.substring(0, 12) + '...' : event.summary}
-                              </div>
-                            ))}
-                            {dayEvents.length > 2 && (
-                              <div 
-                                className="event more-events clickable" 
-                                title={`Click to see all ${dayEvents.length} events`}
-                                onClick={() => handleEventClick(dayEvents[2], day)}
-                              >
-                                +{dayEvents.length - 2} more
+                            <div className="events-container">
+                              {dayEvents.map((event, eventIndex) => (
+                                <div 
+                                  key={eventIndex} 
+                                  className="event clickable" 
+                                  title={`${event.summary}${event.description ? ` - ${event.description}` : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEventClick(event, day)
+                                  }}
+                                >
+                                  {event.summary.length > 12 ? event.summary.substring(0, 9) + '...' : event.summary}
+                                </div>
+                              ))}
+                            </div>
+                            {dayEvents.length > 1 && (
+                              <div className="event-count-indicator compact">
+                                {dayEvents.length}
                               </div>
                             )}
+                          </div>
+                        )}
+                        {dayEvents.length === 0 && (
+                          <div 
+                            className="add-event-overlay" 
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleAddEventClick(day)
+                            }}
+                          >
+                            <span className="add-event-plus">+</span>
                           </div>
                         )}
                       </div>
@@ -665,10 +821,171 @@ function CalendarPage({ events, onNavigate }) {
                   </div>
                 )}
               </div>
+              
+              <div className="popup-actions">
+                <button className="delete-button" onClick={handleDeleteEvent}>
+                  Delete Event
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+      
+      {showAddEventPopup && addEventDate && (
+        <AddEventPopup 
+          date={addEventDate}
+          onClose={closeAddEventPopup}
+          onSave={(newEvent) => {
+            setEvents(prev => [...prev, newEvent])
+            closeAddEventPopup()
+          }}
+        />
+      )}
+      
+      {showDeleteConfirm && (
+        <div className="event-popup-overlay" onClick={cancelDeleteEvent}>
+          <div className="event-popup delete-confirm-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="popup-content">
+              <h3 className="popup-title">Delete Event</h3>
+              <p>Are you sure you want to permanently delete this event?</p>
+              <p><strong>"{selectedEvent?.summary}"</strong></p>
+              
+              <div className="popup-actions">
+                <button className="delete-button" onClick={confirmDeleteEvent}>
+                  Yes, Delete
+                </button>
+                <button className="cancel-button" onClick={cancelDeleteEvent}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {contextMenu.show && (
+        <>
+          <div className="context-menu-overlay" onClick={closeContextMenu} />
+          <div 
+            className="context-menu"
+            style={{
+              left: contextMenu.x,
+              top: contextMenu.y
+            }}
+          >
+            <button onClick={handleContextMenuAddEvent}>
+              Add Event
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function AddEventPopup({ date, onClose, onSave }) {
+  const [eventType, setEventType] = useState('Birthday')
+  const [eventName, setEventName] = useState('')
+  const [birthYear, setBirthYear] = useState('')
+  const [birthDate, setBirthDate] = useState(format(date, 'yyyy-MM-dd'))
+
+  const handleSave = () => {
+    if (!eventName.trim()) {
+      alert('Please enter an event name')
+      return
+    }
+    
+    if (!birthYear.trim()) {
+      alert('Please enter a birth/anniversary year')
+      return
+    }
+
+    const selectedDate = new Date(birthDate)
+    const currentYear = new Date().getFullYear()
+    
+    const newEvent = {
+      summary: `${eventName}${eventType === 'Anniversary' ? ' [Anniversary]' : ''}`,
+      startDate: new Date(currentYear, selectedDate.getMonth(), selectedDate.getDate()),
+      endDate: new Date(currentYear, selectedDate.getMonth(), selectedDate.getDate()),
+      yearBorn: parseInt(birthYear),
+      description: '',
+      location: '',
+      month: selectedDate.getMonth(),
+      day: selectedDate.getDate()
+    }
+
+    onSave(newEvent)
+  }
+
+  return (
+    <div className="event-popup-overlay" onClick={onClose}>
+      <div className="event-popup add-event-popup" onClick={(e) => e.stopPropagation()}>
+        <button className="popup-close-button" onClick={onClose}>
+          Close
+        </button>
+        
+        <div className="popup-content">
+          <h3 className="popup-title">Add New Event</h3>
+          
+          <div className="popup-details">
+            <div className="popup-field">
+              <strong>Event Type:</strong>
+              <select 
+                value={eventType} 
+                onChange={(e) => setEventType(e.target.value)}
+                className="event-input"
+              >
+                <option value="Birthday">Birthday</option>
+                <option value="Anniversary">Anniversary</option>
+              </select>
+            </div>
+            
+            <div className="popup-field">
+              <strong>Name:</strong>
+              <input 
+                type="text"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                placeholder="Enter person's name or event title"
+                className="event-input"
+              />
+            </div>
+            
+            <div className="popup-field">
+              <strong>Date:</strong>
+              <input 
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                className="event-input"
+              />
+            </div>
+            
+            <div className="popup-field">
+              <strong>{eventType === 'Birthday' ? 'Birth Year:' : 'Anniversary Year:'}</strong>
+              <input 
+                type="number"
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
+                placeholder="e.g. 1990"
+                min="1900"
+                max={new Date().getFullYear()}
+                className="event-input"
+              />
+            </div>
+          </div>
+          
+          <div className="popup-actions">
+            <button className="save-button" onClick={handleSave}>
+              Save Event
+            </button>
+            <button className="cancel-button" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
