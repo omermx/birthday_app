@@ -1,15 +1,18 @@
 # Birthday Tracker
 
-A totally vibe coded, modern web application for tracking birthdays and anniversaries by importing calendar files. Built with React and powered by Vite for fast development and optimal performance.
+A totally vibe coded, modern web application for tracking birthdays and anniversaries with full event management capabilities. Import, create, categorize, and export your birthday calendar with ease. Built with React and powered by Vite for fast development and optimal performance.
 
 ## Overview
 
-Birthday Tracker helps you keep track of all your friends' and family's birthdays in one convenient place. Simply upload your calendar files (.ics/.ical format) and view all your important dates in an intuitive monthly calendar interface.
+Birthday Tracker helps you keep track of all your friends' and family's birthdays in one convenient place. Simply upload your calendar files (.ics/.ical format), manage events with categorized prefixes, and export your complete birthday calendar whenever needed. View all your important dates in an intuitive monthly calendar interface with full create, read, update, and delete capabilities.
 
 ## Features
 
 - **Calendar Import**: Upload .ics and .ical files to import birthday and anniversary events
+- **Calendar Export**: Download your events as .ics or .ical files with format selection dialog
 - **Monthly Calendar View**: Browse through years with a responsive grid layout showing all events
+- **Event Management**: Create, view, and delete events with real-time updates
+- **Event Categorization**: Prefix events with types like [Family Birthday], [Work Anniversary], etc.
 - **Event Details**: Click on any event to see detailed information including age calculations
 - **Smart Date Processing**: Automatically extracts birth years from event descriptions
 - **Anniversary Support**: Distinguishes between birthdays and anniversaries with appropriate labeling
@@ -24,8 +27,38 @@ Birthday Tracker helps you keep track of all your friends' and family's birthday
 4. Open your browser and navigate to the local development URL
 5. Upload a calendar file containing birthday/anniversary events OR use the 'dummy-calendar.ics' file provided in the repository
 6. Browse your events in the calendar view
+7. Add new events by right-clicking on any calendar day or hovering over empty days
+8. Click on events to view details or delete them
+9. Download your complete calendar anytime from the menu or welcome page
 
 ## Release Notes
+
+### V0.3 - Event Categorization & Export Functionality
+
+**Key Features Added:**
+- 📥 **Calendar Export**: Download your events as .ics or .ical files with format selection popup
+- 🏷️ **Event Type Prefixing**: All events now include category prefixes (e.g., "[Family Birthday] John")
+- 📊 **Enhanced Event Categories**: Expanded event types including:
+  - Family Birthday, Friend Birthday, Work Birthday
+  - Anniversary, Work Anniversary
+  - Other Celebration
+- 🗑️ **Delete Confirmation**: Added confirmation dialog when deleting events for safety
+- 💾 **Real-time Data Updates**: Both add and delete operations immediately update the calendar view
+- 📤 **Smart Export Options**: Download button only appears when events exist to export
+
+**User Experience Improvements:**
+- Download Calendar feature accessible from both hamburger menu and welcome page
+- Event creation now includes descriptive prefixes for better organization
+- Confirmation dialogs prevent accidental event deletion
+- Export popup shows event count before download
+- Dynamic form labels based on selected event type (Birth Year vs Year)
+
+**Technical Enhancements:**
+- ICS file generation with proper VCALENDAR format and yearly recurrence rules
+- Blob API integration for client-side file downloads
+- Enhanced state management for add/delete operations with proper data flow
+- Conditional rendering for download options based on event existence
+- Improved event type detection for anniversary vs birthday displays
 
 ### V0.2 - Enhanced Event Management & Navigation
 

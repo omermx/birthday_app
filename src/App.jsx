@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FaBars, FaTimes, FaCalendarAlt, FaUpload, FaHome, FaCheck, FaArrowLeft, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { FaBars, FaTimes, FaCalendarAlt, FaUpload, FaHome, FaCheck, FaArrowLeft, FaChevronLeft, FaChevronRight, FaDownload } from 'react-icons/fa'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns'
 import ICAL from 'ical.js'
 import './App.css'
@@ -10,6 +10,7 @@ function App() {
   const [events, setEvents] = useState([])
   const [showSuccessPopup, setShowSuccessPopup] = useState(false)
   const [eventCount, setEventCount] = useState(0)
+  const [showDownloadPopup, setShowDownloadPopup] = useState(false)
   const [, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -94,16 +95,66 @@ function App() {
     reader.readAsText(file)
   }
 
+  const generateICSContent = () => {
+    const cal = new ICAL.Component(['vcalendar', [], []])
+    cal.updatePropertyWithValue('version', '2.0')
+    cal.updatePropertyWithValue('prodid', '-//Birthday Tracker//EN')
+    
+    events.forEach(event => {
+      const vevent = new ICAL.Component('vevent')
+      const startDate = new Date(event.yearBorn, event.month, event.day)
+      const endDate = new Date(event.yearBorn, event.month, event.day + 1)
+      
+      // Create ICAL.Time objects
+      const icalStartDate = ICAL.Time.fromJSDate(startDate)
+      const icalEndDate = ICAL.Time.fromJSDate(endDate)
+      
+      vevent.updatePropertyWithValue('uid', `${event.summary}-${event.yearBorn}-${event.month}-${event.day}@birthdaytracker`)
+      vevent.updatePropertyWithValue('summary', event.summary)
+      vevent.updatePropertyWithValue('dtstart', icalStartDate)
+      vevent.updatePropertyWithValue('dtend', icalEndDate)
+      
+      if (event.description || event.yearBorn) {
+        vevent.updatePropertyWithValue('description', `${event.yearBorn}`)
+      }
+      
+      if (event.location) {
+        vevent.updatePropertyWithValue('location', event.location)
+      }
+      
+      // Add recurrence rule for yearly repeat
+      vevent.updatePropertyWithValue('rrule', 'FREQ=YEARLY')
+      
+      cal.addSubcomponent(vevent)
+    })
+    
+    return cal.toString()
+  }
+
+  const downloadCalendar = (format) => {
+    const content = generateICSContent()
+    const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `birthday-calendar.${format}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setShowDownloadPopup(false)
+  }
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'welcome':
-        return <WelcomePage onNavigate={navigateTo} events={events} />
+        return <WelcomePage onNavigate={navigateTo} events={events} onDownload={() => setShowDownloadPopup(true)} />
       case 'upload':
         return <UploadPage onFileUpload={handleFileUpload} onNavigate={navigateTo} />
       case 'calendar':
-        return <CalendarPage events={events} onNavigate={navigateTo} />
+        return <CalendarPage events={events} setEvents={setEvents} onNavigate={navigateTo} />
       default:
-        return <WelcomePage onNavigate={navigateTo} events={events} />
+        return <WelcomePage onNavigate={navigateTo} events={events} onDownload={() => setShowDownloadPopup(true)} />
     }
   }
 
@@ -129,6 +180,11 @@ function App() {
         <button onClick={() => navigateTo('calendar')}>
           <FaCalendarAlt /> View Calendar
         </button>
+        {events && events.length > 0 && (
+          <button onClick={() => setShowDownloadPopup(true)}>
+            <FaDownload /> Download Calendar
+          </button>
+        )}
       </nav>
       
       <main className="main-content">
@@ -143,11 +199,49 @@ function App() {
           </span>
         </div>
       )}
+      
+      {showDownloadPopup && (
+        <div className="event-popup-overlay" onClick={() => setShowDownloadPopup(false)}>
+          <div className="event-popup" onClick={(e) => e.stopPropagation()}>
+            <button className="popup-close-button" onClick={() => setShowDownloadPopup(false)}>
+              Close
+            </button>
+            
+            <div className="popup-content">
+              <h3 className="popup-title">Download Calendar</h3>
+              <p>Choose the format for your calendar export:</p>
+              
+              <div className="popup-actions" style={{ flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
+                <button 
+                  className="save-button" 
+                  onClick={() => downloadCalendar('ics')}
+                  style={{ width: '100%' }}
+                >
+                  <FaDownload style={{ marginRight: '0.5rem' }} />
+                  Download as .ics
+                </button>
+                <button 
+                  className="save-button" 
+                  onClick={() => downloadCalendar('ical')}
+                  style={{ width: '100%' }}
+                >
+                  <FaDownload style={{ marginRight: '0.5rem' }} />
+                  Download as .ical
+                </button>
+              </div>
+              
+              <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#666' }}>
+                {events.length} event{events.length !== 1 ? 's' : ''} will be exported
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function WelcomePage({ onNavigate, events }) {
+function WelcomePage({ onNavigate, events, onDownload }) {
   const getUpcomingEventsThisMonth = () => {
     if (!events || events.length === 0) return 0
     
@@ -186,6 +280,13 @@ function WelcomePage({ onNavigate, events }) {
           <h3>View Calendar</h3>
           <p>See all birthdays in a monthly calendar view</p>
         </div>
+        {events && events.length > 0 && (
+          <div className="feature" onClick={onDownload}>
+            <FaDownload size={40} />
+            <h3>Download Calendar</h3>
+            <p>Export your birthday events to .ics format</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -241,7 +342,7 @@ function UploadPage({ onFileUpload, onNavigate }) {
   )
 }
 
-function CalendarPage({ events, onNavigate }) {
+function CalendarPage({ events, setEvents, onNavigate }) {
   const [showEmptyState, setShowEmptyState] = useState(false)
   const [gridColumns, setGridColumns] = useState(1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -805,13 +906,13 @@ function CalendarPage({ events, onNavigate }) {
                 
                 {selectedEvent.yearBorn && (
                   <div className="popup-field">
-                    <strong>{selectedEvent.summary.includes('[Anniversary]') ? 'Year:' : 'Born:'}</strong> {selectedEvent.yearBorn}
+                    <strong>{selectedEvent.summary.includes('Anniversary') ? 'Year:' : 'Born:'}</strong> {selectedEvent.yearBorn}
                   </div>
                 )}
                 
                 {calculateAge(selectedEvent, eventDate) !== null && (
                   <div className="popup-field age-field">
-                    <strong>{selectedEvent.summary.includes('[Anniversary]') ? 'Years Ago:' : 'Age:'}</strong> {calculateAge(selectedEvent, eventDate)} {selectedEvent.summary.includes('[Anniversary]') ? 'years ago' : 'years old'}
+                    <strong>{selectedEvent.summary.includes('Anniversary') ? 'Years Ago:' : 'Age:'}</strong> {calculateAge(selectedEvent, eventDate)} {selectedEvent.summary.includes('Anniversary') ? 'years ago' : 'years old'}
                   </div>
                 )}
                 
@@ -885,7 +986,7 @@ function CalendarPage({ events, onNavigate }) {
 }
 
 function AddEventPopup({ date, onClose, onSave }) {
-  const [eventType, setEventType] = useState('Birthday')
+  const [eventType, setEventType] = useState('Family Birthday')
   const [eventName, setEventName] = useState('')
   const [birthYear, setBirthYear] = useState('')
   const [birthDate, setBirthDate] = useState(format(date, 'yyyy-MM-dd'))
@@ -897,7 +998,7 @@ function AddEventPopup({ date, onClose, onSave }) {
     }
     
     if (!birthYear.trim()) {
-      alert('Please enter a birth/anniversary year')
+      alert('Please enter a year')
       return
     }
 
@@ -905,7 +1006,7 @@ function AddEventPopup({ date, onClose, onSave }) {
     const currentYear = new Date().getFullYear()
     
     const newEvent = {
-      summary: `${eventName}${eventType === 'Anniversary' ? ' [Anniversary]' : ''}`,
+      summary: `[${eventType}] ${eventName}`,
       startDate: new Date(currentYear, selectedDate.getMonth(), selectedDate.getDate()),
       endDate: new Date(currentYear, selectedDate.getMonth(), selectedDate.getDate()),
       yearBorn: parseInt(birthYear),
@@ -936,8 +1037,12 @@ function AddEventPopup({ date, onClose, onSave }) {
                 onChange={(e) => setEventType(e.target.value)}
                 className="event-input"
               >
-                <option value="Birthday">Birthday</option>
+                <option value="Family Birthday">Family Birthday</option>
+                <option value="Friend Birthday">Friend Birthday</option>
+                <option value="Work Birthday">Work Birthday</option>
                 <option value="Anniversary">Anniversary</option>
+                <option value="Work Anniversary">Work Anniversary</option>
+                <option value="Other">Other Celebration</option>
               </select>
             </div>
             
@@ -963,7 +1068,7 @@ function AddEventPopup({ date, onClose, onSave }) {
             </div>
             
             <div className="popup-field">
-              <strong>{eventType === 'Birthday' ? 'Birth Year:' : 'Anniversary Year:'}</strong>
+              <strong>{eventType.includes('Birthday') ? 'Birth Year:' : 'Year:'}</strong>
               <input 
                 type="number"
                 value={birthYear}
