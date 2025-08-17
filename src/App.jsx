@@ -69,7 +69,10 @@ function App() {
           const yearMatch = description.match(/\b(19|20)\d{2}\b/)
           const yearFromDescription = yearMatch ? parseInt(yearMatch[0]) : null
           
+          const uid = event.uid || `${event.summary}-${originalStartDate.getTime()}`
+
           const parsedEvent = {
+            id: uid,
             summary: event.summary,
             startDate: normalizedStartDate,
             endDate: normalizedEndDate,
@@ -150,7 +153,7 @@ function App() {
       case 'welcome':
         return <WelcomePage onNavigate={navigateTo} events={events} onDownload={() => setShowDownloadPopup(true)} />
       case 'upload':
-        return <UploadPage onFileUpload={handleFileUpload} onNavigate={navigateTo} />
+        return <UploadPage onFileUpload={handleFileUpload} onNavigate={navigateTo} events={events} />
       case 'calendar':
         return <CalendarPage events={events} setEvents={setEvents} onNavigate={navigateTo} />
       default:
@@ -292,7 +295,7 @@ function WelcomePage({ onNavigate, events, onDownload }) {
   )
 }
 
-function UploadPage({ onFileUpload, onNavigate }) {
+function UploadPage({ onFileUpload, onNavigate, events }) {
   const [selectedFile, setSelectedFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
 
@@ -338,6 +341,14 @@ function UploadPage({ onFileUpload, onNavigate }) {
           {isUploading ? 'Uploading...' : 'Upload Calendar'}
         </button>
       </div>
+      <button
+        className="view-calendar-button"
+        onClick={() => onNavigate('calendar')}
+        disabled={!events || events.length === 0}
+        style={{ marginTop: '1rem' }}
+      >
+        View 12 Month Calendar
+      </button>
     </div>
   )
 }
@@ -437,12 +448,7 @@ function CalendarPage({ events, setEvents, onNavigate }) {
 
   const confirmDeleteEvent = () => {
     if (selectedEvent) {
-      setEvents(prev => prev.filter(event => 
-        !(event.summary === selectedEvent.summary && 
-          event.month === selectedEvent.month && 
-          event.day === selectedEvent.day &&
-          event.yearBorn === selectedEvent.yearBorn)
-      ))
+      setEvents(prev => prev.filter(event => event.id !== selectedEvent.id))
       setShowDeleteConfirm(false)
       closeEventPopup()
     }
@@ -1006,6 +1012,7 @@ function AddEventPopup({ date, onClose, onSave }) {
     const currentYear = new Date().getFullYear()
     
     const newEvent = {
+      id: `${eventName}-${new Date().getTime()}`,
       summary: `[${eventType}] ${eventName}`,
       startDate: new Date(currentYear, selectedDate.getMonth(), selectedDate.getDate()),
       endDate: new Date(currentYear, selectedDate.getMonth(), selectedDate.getDate()),
